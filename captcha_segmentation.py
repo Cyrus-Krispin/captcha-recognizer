@@ -25,6 +25,9 @@ class CaptchaSegmenter:
         """Loads the CAPTCHA image and converts it to grayscale."""
         self.image = cv2.imread(self.image_path)
         self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        self.image = cv2.equalizeHist(self.image)
+        # plt.imshow(self.image, cmap="gray")
+        # plt.show()
         
     def load_captcha_text_from_file_name(self):
         """Extracts the CAPTCHA text from the image file name."""
@@ -39,17 +42,22 @@ class CaptchaSegmenter:
         im_bw_inverted = cv2.adaptiveThreshold(
             self.image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 2
         )
+        # plt.imshow(im_bw_inverted, cmap="gray")
+        # plt.show()
 
         # Apply median blur to reduce noise
         im_bw_inverted = cv2.medianBlur(im_bw_inverted, 3)
 
         self.processed_image = im_bw_inverted
+        # plt.imshow(self.processed_image, cmap="gray")
+        # plt.show()
 
     def apply_morphology(self, kernel_size=(1, 1)):
         """Applies morphological closing to connect character parts."""
         kernel = np.ones(kernel_size, np.uint8)  # Adjust kernel size as needed
         self.processed_image = cv2.morphologyEx(self.processed_image, cv2.MORPH_CLOSE, kernel)
-        
+        # plt.imshow(self.processed_image, cmap="gray")
+        # plt.show()
 
     def find_contours(self):
         """Finds contours in the processed image."""
@@ -74,7 +82,7 @@ class CaptchaSegmenter:
         threshold = mean + std_dev 
         filtered_numbers = [num for num in character_widths if num <= threshold]
 
-        self.average_character_width = np.max(filtered_numbers)
+        self.average_character_width = np.max(filtered_numbers) if filtered_numbers else 0
         
         for c in self.contours:
             area = cv2.contourArea(c)
@@ -96,7 +104,22 @@ class CaptchaSegmenter:
         """Extracts character regions from the contours."""
         self.apply_morphology(kernel_size=(2, 2))
         self.find_contours()
-        print("Number of contours:", len(self.contours))
+        
+        character_widths = []
+        # Collect character widths
+        for c in self.contours:
+            area = cv2.contourArea(c)
+            if area > self.min_area:
+                (x, y, w, h) = cv2.boundingRect(c)
+                character_widths.append(w)
+
+        mean = np.mean(character_widths)
+        std_dev = np.std(character_widths)
+        threshold = mean + std_dev 
+        filtered_numbers = [num for num in character_widths if num <= threshold]
+
+        self.average_character_width = np.max(filtered_numbers) if filtered_numbers else 0
+        
         for c in self.contours:
             area = cv2.contourArea(c)
             if area > self.min_area:
@@ -105,46 +128,78 @@ class CaptchaSegmenter:
                     
                 self.letter_regions.append((x, y, w, h))
         
-        if len(self.letter_regions) != len(self.captcha_text):
-            # skip this image if the number of detected regions is greater than the number of character
-            self.letter_regions = []
+        print("Letter regions:", len(self.letter_regions))
         
-        # if len(self.letter_regions) < len(self.captcha_text):
-            # have to change kernel size maybe
+        # if len(self.letter_regions) != len(self.captcha_text):
+        #     # skip this image if the number of detected regions is greater than the number of character
+        #     self.letter_regions = []
+        
                 
 
         print(f"Detected {len(self.letter_regions)} character regions")
     
     
     def segment_characters(self):
-        """sort the detected letter images based on the x coordinate and save each character as a single image"""
+        """Sort the detected letter images based on the x coordinate and save each character as a single image."""
         self.get_character_regions_with_kernel_2()
+        
         if not self.letter_regions:
             self.get_character_regions_with_kernel_1()
+        
         if not self.letter_regions:
             return
+        
+        # Sort the letter regions based on the x coordinate
         self.letter_regions = sorted(self.letter_regions, key=lambda x: x[0])
+        
         char_index = 0
+        ROIs = []  # List to store ROIs for all characters
+        coordinates = []
+
+        # Process each character region
         for (x, y, w, h) in self.letter_regions:
-            # Draw bounding box around each character
-            cv2.rectangle(self.image, (x, y), (x + w, y + h), (36, 255, 12), 2)
-            
-            # Extract and save each character as a Region of Interest (ROI)
-            ROI = self.processed_image[y:y + h, x:x + w]
-            
-            # Save each segmented character
-            output_dir = os.path.join(self.output_folder, self.captcha_text[char_index])
-            
+            if w > 2 * self.average_character_width:
+                num_segments = int(round(w / self.average_character_width))
+                segment_width = w // num_segments
+                
+                for i in range(num_segments):
+                    x_segment = x + i * segment_width
+                    w_segment = segment_width if i < num_segments - 1 else (w - i * segment_width)
+                    ROI = self.processed_image[y:y + h, x_segment:x_segment + w_segment]
+                    try:
+                        ROIs.append((ROI, self.captcha_text[char_index]))  # Store ROI and corresponding character text
+                        char_index += 1
+                    except:
+                        print("Skipping image due to incorrect number of ROIs")
+                        self.letter_regions = []
+                        return
+            else:
+                ROI = self.processed_image[y:y + h, x:x + w]
+                try:
+                    ROIs.append((ROI, self.captcha_text[char_index]))  # Store ROI and corresponding character text
+                    char_index += 1
+                except:
+                    print("Skipping image due to incorrect number of ROIs")
+                    self.letter_regions = []
+                    return
+                # ROIs.append((ROI, self.captcha_text[char_index]))  # Store ROI and corresponding character text
+                # char_index += 1
+        
+        # After collecting all ROIs, write them to disk
+        if len(ROIs) != len(self.captcha_text):
+            print("Skipping image due to incorrect number of ROIs")
+            self.letter_regions = []  # Clear the letter regions
+            return
+        for roi, character in ROIs:
+            output_dir = os.path.join(self.output_folder, character)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
-            
-            # if it exits, count the number of files in the directory and increment the image number
             image_number = len(os.listdir(output_dir)) + 1
-                
-            cv2.imwrite(os.path.join(output_dir, f"{image_number}.png"), ROI)
-            char_index += 1
+            cv2.imwrite(os.path.join(output_dir, f"{image_number}.png"), roi)
         
+        # Clear the letter regions after processing
         self.letter_regions = []
+
 
     def run_segmentation(self):
         """Runs the full segmentation process."""
@@ -161,15 +216,16 @@ class CaptchaSegmenter:
         # print("Segmenting characters...")
         self.segment_characters()
         # print("Segmentation completed!")
+        
 
 
-image_path = "train/a70ond9c-0.png" 
-segmenter = CaptchaSegmenter(image_path)
-segmenter.run_segmentation()
+# image_path = "train/a70ond9c-0.png" 
+# segmenter = CaptchaSegmenter(image_path)
+# segmenter.run_segmentation()
 
 # for all the files in the train folder
-# for image_path in os.listdir("train"):
-#     if image_path.endswith(".png"):
-#         print(f"Processing {image_path}")
-#         segmenter = CaptchaSegmenter(os.path.join("train", image_path))
-#         segmenter.run_segmentation()
+for image_path in os.listdir("train"):
+    if image_path.endswith(".png"):
+        print(f"Processing {image_path}")
+        segmenter = CaptchaSegmenter(os.path.join("train", image_path))
+        segmenter.run_segmentation()
