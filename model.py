@@ -134,7 +134,7 @@ lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min
 # Train the neural network
 model.fit(datagen.flow(X_train, Y_train, batch_size=32),
           validation_data=(X_test, Y_test),
-          epochs=10, verbose=1,
+          epochs=30, verbose=1,
           callbacks=[early_stopping, lr_scheduler])
 
 # Save the trained model to disk
