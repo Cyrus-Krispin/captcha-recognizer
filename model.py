@@ -45,10 +45,13 @@ def resize_to_fit(image, width, height):
 
 # Loop over the input images
 for label in os.listdir(LETTER_IMAGES_FOLDER):
+    #print("[INFO] Processing images for letter: {}".format(label))
     label_folder = os.path.join(LETTER_IMAGES_FOLDER, label)
+    #print(label_folder)
     if os.path.isdir(label_folder):  # Check if it is a directory
         for image_file in os.listdir(label_folder):
             image_path = os.path.join(label_folder, image_file)
+            #print(image_path)
 
             # Load the image and convert it to grayscale
             image = cv2.imread(image_path)
@@ -69,6 +72,8 @@ for label in os.listdir(LETTER_IMAGES_FOLDER):
 # Scale the raw pixel intensities to the range [0, 1] (this improves training)
 data = np.array(data, dtype="float") / 255.0
 labels = np.array(labels)
+print("[INFO] data shape: {}".format(data.shape))
+print("[INFO] labels shape: {}".format(labels.shape))
 
 # Split the training data into separate train and test sets
 (X_train, X_test, Y_train, Y_test) = train_test_split(data, labels, test_size=0.25, random_state=0)

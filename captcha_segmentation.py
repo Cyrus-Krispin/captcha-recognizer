@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 
 class CaptchaSegmenter:
-    def __init__(self, image_path, output_folder="extracted_letter_images", min_area=50):
+    def __init__(self, image_path, output_folder="extracted_letter_images", min_area=20):
         self.image_path = image_path
         self.output_folder = output_folder
         self.min_area = min_area
@@ -15,6 +15,7 @@ class CaptchaSegmenter:
         self.contours = None
         self.letter_regions = []
         self.captcha_text = None
+        self.average_character_width = 0
         
         # Create the output folder if it doesn't exist
         if not os.path.exists(self.output_folder):
@@ -30,6 +31,7 @@ class CaptchaSegmenter:
         captcha_text = os.path.basename(self.image_path).split(".")[0]
         captcha_text = captcha_text.split("-")[0]
         self.captcha_text = captcha_text
+        print(f"CAPTCHA text: {captcha_text}")
     
     def preprocess_image(self):
         """Applies adaptive thresholding and median blur for segmentation."""
@@ -47,6 +49,7 @@ class CaptchaSegmenter:
         """Applies morphological closing to connect character parts."""
         kernel = np.ones(kernel_size, np.uint8)  # Adjust kernel size as needed
         self.processed_image = cv2.morphologyEx(self.processed_image, cv2.MORPH_CLOSE, kernel)
+        
 
     def find_contours(self):
         """Finds contours in the processed image."""
@@ -57,6 +60,22 @@ class CaptchaSegmenter:
         """Extracts character regions from the contours."""
         self.apply_morphology(kernel_size=(1, 1))
         self.find_contours()
+        
+        character_widths = []
+        # Collect character widths
+        for c in self.contours:
+            area = cv2.contourArea(c)
+            if area > self.min_area:
+                (x, y, w, h) = cv2.boundingRect(c)
+                character_widths.append(w)
+
+        mean = np.mean(character_widths)
+        std_dev = np.std(character_widths)
+        threshold = mean + std_dev 
+        filtered_numbers = [num for num in character_widths if num <= threshold]
+
+        self.average_character_width = np.max(filtered_numbers)
+        
         for c in self.contours:
             area = cv2.contourArea(c)
             if area > self.min_area:
@@ -73,15 +92,15 @@ class CaptchaSegmenter:
 
         print(f"Detected {len(self.letter_regions)} character regions")
     
-    def get_character_regions_with_kernel_3(self):
+    def get_character_regions_with_kernel_2(self):
         """Extracts character regions from the contours."""
-        self.apply_morphology(kernel_size=(3, 3))
+        self.apply_morphology(kernel_size=(2, 2))
         self.find_contours()
+        print("Number of contours:", len(self.contours))
         for c in self.contours:
             area = cv2.contourArea(c)
             if area > self.min_area:
                 (x, y, w, h) = cv2.boundingRect(c)
-                # check if irregular shape if possible
                 
                     
                 self.letter_regions.append((x, y, w, h))
@@ -99,7 +118,7 @@ class CaptchaSegmenter:
     
     def segment_characters(self):
         """sort the detected letter images based on the x coordinate and save each character as a single image"""
-        self.get_character_regions_with_kernel_3()
+        self.get_character_regions_with_kernel_2()
         if not self.letter_regions:
             self.get_character_regions_with_kernel_1()
         if not self.letter_regions:
@@ -144,9 +163,13 @@ class CaptchaSegmenter:
         # print("Segmentation completed!")
 
 
+image_path = "train/a70ond9c-0.png" 
+segmenter = CaptchaSegmenter(image_path)
+segmenter.run_segmentation()
+
 # for all the files in the train folder
-for image_path in os.listdir("train"):
-    if image_path.endswith(".png"):
-        print(f"Processing {image_path}")
-        segmenter = CaptchaSegmenter(os.path.join("train", image_path))
-        segmenter.run_segmentation()
+# for image_path in os.listdir("train"):
+#     if image_path.endswith(".png"):
+#         print(f"Processing {image_path}")
+#         segmenter = CaptchaSegmenter(os.path.join("train", image_path))
+#         segmenter.run_segmentation()
