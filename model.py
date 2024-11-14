@@ -87,13 +87,12 @@ with open(MODEL_LABELS_FILENAME, "wb") as f:
 
 # Create an image data generator for augmentation
 datagen = ImageDataGenerator(
-    rotation_range=10,  # Rotate images by up to 10 degrees
-    zoom_range=0.1,  # Zoom in by 10%
-    width_shift_range=0.1,  # Shift images horizontally
-    height_shift_range=0.1,  # Shift images vertically
+    rotation_range=30,  # Rotate images by up to 10 degrees
+    zoom_range=0.2,  # Zoom in by 10%
+    width_shift_range=0.2,  # Shift images horizontally
+    height_shift_range=0.2,  # Shift images vertically
     shear_range=0.2,  # Shear images randomly
-    horizontal_flip=True,  # Flip images horizontally
-    fill_mode="nearest"  # How to fill missing pixels after transformations
+ # How to fill missing pixels after transformations
 )
 
 # Fit the generator on the training data
