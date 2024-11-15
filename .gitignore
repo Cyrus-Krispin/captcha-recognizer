@@ -5,4 +5,6 @@ extracted_letter_images/
 main/
 segmented_images/
 error_images/
-cleaned_images
+cleaned_images/
+check_2/
+train.zip

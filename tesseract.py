@@ -1,6 +1,7 @@
 import os
 import cv2
 import pytesseract
+import shutil
 
 def check_labels(input_folder, output_folder):
     # Iterate over each image in the dataset
@@ -27,8 +28,11 @@ def check_labels(input_folder, output_folder):
         if len(ocr_text) != len(expected_text):
             print(f"Potential mismatch in file {image_file}: Expected '{expected_text}', got '{ocr_text}'")
             # Optionally save mismatches for manual inspection
-            cv2.imwrite(os.path.join(output_folder, f'{expected_text}-0.png'), gry)
+            # Copy the file from train folder to output_folder
+            shutil.copy2(os.path.abspath(train_folder) + f'\\{expected_text}-0.png', os.path.abspath(output_folder))
+            # cv2.imwrite(os.path.join(output_folder, f'{expected_text}-0.png'), gry)
 
+train_folder = "train"
 input_folder = "error_images"
 output_folder = "cleaned_images"
 os.makedirs(output_folder, exist_ok=True)
