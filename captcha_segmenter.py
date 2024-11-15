@@ -99,12 +99,11 @@ class CaptchaSegmenter:
             hist = cv2.calcHist([hue], [0], segment_mask_binary, [180], [0, 180]).flatten()
             peak_threshold = 0.3 * max(hist)
             peaks = np.sort(np.where(hist > peak_threshold)[0])
-            peaks = peaks[peaks > 0]
 
             combined_peaks = [peaks[0]] if len(peaks) > 0 else []
 
             for peak in peaks[1:]:
-                if abs(peak - combined_peaks[-1]) >= 2:
+                if abs(peak - combined_peaks[-1]) >= 3:
                     combined_peaks.append(peak)
 
             peaks = np.array(combined_peaks)
@@ -112,6 +111,23 @@ class CaptchaSegmenter:
             segment_contours = []
 
             for peak in peaks:
+                if peak == 0:
+                    # Count black and non-black pixels with hue 0
+                    black_pixels_with_hue_0 = np.sum((hue == 0) & (value < 50))
+                    non_black_pixels_with_hue_0 = np.sum((hue == 0) & (value >= 50))
+                    total_pixels = hue.size
+                    non_black_non_white_pixels_with_hue_0 = np.sum((hue == 0) & (value >= 50) & (value < 250))
+
+                    # Skip processing if more than 50% of total pixels are black and no non-black pixels
+                    if black_pixels_with_hue_0 / total_pixels < 0.3:
+                        if non_black_non_white_pixels_with_hue_0:
+                            non_black_mask = (value >= 50).astype(np.uint8) * 255
+                            hsv_segment[non_black_mask == 0] = [0, 0, 255]  # White in HSV
+                        else:
+                            continue
+
+                        
+
                 lower_bound = np.array([max(peak - 2, 0)], dtype=np.uint8)
                 upper_bound = np.array([min(peak + 2, 179)], dtype=np.uint8)
 
