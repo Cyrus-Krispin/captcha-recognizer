@@ -17,34 +17,35 @@ MODEL_LABELS_FILENAME = "model_labels.dat"
 data = []
 labels = []
 
-def resize_to_fit(self, letter_image, target_size=40):
-        """
-        Resize the letter image to fit within a target size (40x40) while maintaining aspect ratio.
-        Adds padding to fill empty space and make the image square.
-        """
-        # Get current dimensions of the letter image
-        print(letter_image)
-        h = letter_image.shape[0]
-        w = letter_image.shape[1]
+# def resize_to_fit(letter_image, target_size=40):
+#         """
+#         Resize the letter image to fit within a target size (40x40) while maintaining aspect ratio.
+#         Adds padding to fill empty space and make the image square.
+#         """
+#         h = letter_image.shape[0]
+#         w = letter_image.shape[1]
         
-        # Calculate the scaling factor to fit the image within the target size
-        scale = target_size / max(h, w)
-        new_w, new_h = int(w * scale), int(h * scale)
+#         # Calculate the scaling factor to fit the image within the target size
+#         scale = target_size / max(h, w)
+#         new_w, new_h = int(w * scale), int(h * scale)
         
-        # Resize the image while maintaining aspect ratio
-        resized_image = cv2.resize(letter_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+#         # Resize the image while maintaining aspect ratio
+#         if new_w > 0 and new_h > 0:
+#             resized_image = cv2.resize(letter_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+#         else:
+#             resized_image = letter_image
         
-        # Create a 40x40 blank canvas with white padding (255 for white)
-        padded_image = np.ones((target_size, target_size), dtype=np.uint8) * 0
+#         # Create a 40x40 blank canvas with white padding (255 for white)
+#         padded_image = np.ones((target_size, target_size), dtype=np.uint8) * 0
         
-        # Calculate padding to center the resized image on the canvas
-        x_offset = (target_size - new_w) // 2
-        y_offset = (target_size - new_h) // 2
+#         # Calculate padding to center the resized image on the canvas
+#         x_offset = (target_size - new_w) // 2
+#         y_offset = (target_size - new_h) // 2
         
-        # Place the resized image onto the canvas
-        padded_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized_image
+#         # Place the resized image onto the canvas
+#         padded_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized_image
         
-        return padded_image
+#         return padded_image
 
 # Loop over the input images
 for label in os.listdir(LETTER_IMAGES_FOLDER):
@@ -60,7 +61,7 @@ for label in os.listdir(LETTER_IMAGES_FOLDER):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             # Resize the letter so it fits in a 20x20 pixel box
-            image = resize_to_fit(image)
+            image = cv2.resize(image, (40, 40), interpolation=cv2.INTER_AREA)
 
             # Add a third channel dimension to the image to make Keras happy
             image = np.expand_dims(image, axis=2)
@@ -88,12 +89,12 @@ with open(MODEL_LABELS_FILENAME, "wb") as f:
 
 # Create an image data generator for augmentation
 datagen = ImageDataGenerator(
-    rotation_range=30,  # Rotate images by up to 10 degrees
-    zoom_range=0.2,  # Zoom in by 10%
-    width_shift_range=0.2,  # Shift images horizontally
-    height_shift_range=0.2,  # Shift images vertically
-    shear_range=0.2,  # Shear images randomly
- # How to fill missing pixels after transformations
+    rotation_range=5,          # Small rotations for slight text tilts
+    zoom_range=0.1,            # Slight zoom for text size variations
+    width_shift_range=0.1,     # Small horizontal shifts
+    height_shift_range=0.1,    # Small vertical shifts
+    shear_range=0.1,           # Small shear to simulate text slanting
+    fill_mode="nearest"        # Fill missing pixels using nearest-neighbor interpolation
 )
 
 # Fit the generator on the training data
@@ -106,18 +107,18 @@ model = Sequential()
 model.add(Conv2D(32, (5, 5), padding="same", input_shape=(40, 40, 1), activation="relu"))
 model.add(BatchNormalization())
 model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-model.add(Dropout(0.25))  # Dropout layer
+#model.add(Dropout(0.25))  # Dropout layer
 
 # Second convolutional layer with batch normalization, dropout, and max pooling
 model.add(Conv2D(64, (5, 5), padding="same", activation="relu"))
 model.add(BatchNormalization())
 model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-model.add(Dropout(0.25))  # Dropout layer
+#model.add(Dropout(0.25))  # Dropout layer
 
 # Hidden layer with 512 nodes and dropout
 model.add(Flatten())
 model.add(Dense(512, activation="relu"))
-model.add(Dropout(0.5))  # Dropout layer
+#model.add(Dropout(0.5))  # Dropout layer
 
 # Output layer with 36 nodes (26 letters + 10 digits)
 model.add(Dense(36, activation="softmax"))
@@ -134,8 +135,8 @@ lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min
 # Train the neural network
 model.fit(datagen.flow(X_train, Y_train, batch_size=32),
           validation_data=(X_test, Y_test),
-          epochs=30, verbose=1,
-          callbacks=[early_stopping, lr_scheduler])
+          epochs=120, verbose=1,
+          callbacks=[lr_scheduler])
 
 # Save the trained model to disk
 model.save(MODEL_FILENAME)

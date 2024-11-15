@@ -29,23 +29,17 @@ class CaptchaSegmenter:
         # Apply adaptive thresholding to enhance character edges
         adaptive_filtered = cv2.adaptiveThreshold(adjusted, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                                 cv2.THRESH_BINARY_INV, 11, 2)
-        # plt.imshow(adaptive_filtered, cmap='gray')
-        # plt.title('Adaptive Thresholding Filter')
-        # plt.show()
+       
 
         # Apply median filtering to remove lines and smooth the CAPTCHA image
         # Adjust the kernel size (e.g., 3, 5, or 7) based on the thickness of lines to be removed
         median_filtered = cv2.medianBlur(adaptive_filtered, 3)
-        # plt.imshow(median_filtered, cmap='gray')
-        # plt.title('Median Filtered (Lines Removed)')
-        # plt.show()
+      
 
         # Apply a minimal closing operation
         kernel = np.ones((3, 3), np.uint8)  # Small kernel for minimal effect
         closed_image = cv2.morphologyEx(median_filtered, cv2.MORPH_OPEN, kernel, iterations=1)
-        # plt.imshow(closed_image, cmap='gray')
-        # plt.title('After Minimal Closing Operation')
-        # plt.show()
+       
 
         # Find contours to detect the main CAPTCHA area
         contours, _ = cv2.findContours(closed_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -54,7 +48,7 @@ class CaptchaSegmenter:
         # Determine the bounding box that covers all contours
         if not contours:
             print("No contours found in the image.")
-            exit()
+            return
 
         # Get all x and y coordinates from all contours
         all_x = []
@@ -79,10 +73,7 @@ class CaptchaSegmenter:
 
         # Crop the main CAPTCHA area based on the bounding box
         captcha_area = median_filtered[y_min:y_max, x_min:x_max]
-        self.cropped_image = captcha_area   
-        # plt.imshow(captcha_area, cmap='gray')
-        # plt.title('Cropped CAPTCHA Area (Enclosing All Contours)')
-        # plt.show()
+       
             
         # Find contours in the cropped area to analyze letter positions
         contours, _ = cv2.findContours(captcha_area, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -96,9 +87,7 @@ class CaptchaSegmenter:
             cv2.drawContours(contour_visualization, [contour], -1, color, 2)
 
         # Display the image with contours visualized
-        # plt.imshow(contour_visualization)
-        # plt.title('Contours Visualization')
-        # plt.show()
+       
         # Get bounding boxes for each contour
         bounding_boxes = [cv2.boundingRect(contour) for contour in contours]
         bounding_boxes = sorted(bounding_boxes, key=lambda x: x[0])  # Sort by x-coordinate
@@ -107,7 +96,9 @@ class CaptchaSegmenter:
         grouped_boxes = []
         current_group = bounding_boxes[0]
 
+
         for i in range(1, len(bounding_boxes)):
+            
             x, y, w, h = bounding_boxes[i]
             prev_x, prev_y, prev_w, prev_h = current_group
             
@@ -138,10 +129,7 @@ class CaptchaSegmenter:
             cv2.rectangle(grouped_visualization, (x, y), (x + w, y + h), color, 2)
 
         # Display the image with grouped bounding boxes visualized
-        # plt.imshow(grouped_visualization)
-        # plt.title('Grouped Bounding Boxes Visualization')
-        # plt.show()
-
+     
         # Create a copy of the captcha_area to draw vertical lines on
         segmented_image = cv2.cvtColor(captcha_area, cv2.COLOR_GRAY2BGR)
 
@@ -156,9 +144,7 @@ class CaptchaSegmenter:
             cv2.line(segmented_image, (line_x, 0), (line_x, captcha_area.shape[0]), (255, 0, 0), 1)
 
         # Show the segmented image with vertical lines
-        # plt.imshow(segmented_image)
-        # plt.title('Segmented CAPTCHA with Vertical Lines')
-        # plt.show()
+        
         # import cv2
         # import numpy as np
         # from matplotlib import pyplot as plt
@@ -172,21 +158,25 @@ class CaptchaSegmenter:
         # sort the grouped boxes by x-coordinate
         grouped_boxes = sorted(grouped_boxes, key=lambda x: x[0])
 
-        detected_letters = []
+        letters = []
+
+        print("grouped_boxes: ", len(grouped_boxes))
 
         # Loop through each grouped box to analyze color transitions
         for i in range(len(grouped_boxes)):
             # Get the coordinates of the current bounding box
             x, y, w, h = grouped_boxes[i]
-            print(x, y, w, h)
             segment = crop[:, x:min(x + w, x_max_crop)]  # Crop each section based on bounding box positions
-            # plt.imshow(cv2.cvtColor(segment, cv2.COLOR_BGR2RGB))
-            # plt.title(f'Segment {i}')
-            # plt.show()
-            if segment.shape[0] == 0 or segment.shape[1] == 0:
+            if segment.shape[1] == 0 or segment.size == 0:
                 continue
-            # Convert the segment to HSV and extract channels
-            hsv_segment = cv2.cvtColor(segment, cv2.COLOR_BGR2HSV)
+            
+            if segment is not None and segment.size > 0:
+               
+                # Convert the segment to HSV and extract channels
+                hsv_segment = cv2.cvtColor(segment, cv2.COLOR_BGR2HSV)
+            else:
+                print(f"Skipping empty segment {i}")
+                continue
             hue_channel = hsv_segment[:, :, 0]
             saturation_channel = hsv_segment[:, :, 1]
             value_channel = hsv_segment[:, :, 2]
@@ -201,27 +191,33 @@ class CaptchaSegmenter:
             hist = hist.flatten()
 
             # Plot the histogram
-            # plt.figure(figsize=(10, 5))
-            # plt.plot(hist, color='purple')
-            # plt.title("Hue Histogram")
-            # plt.xlabel("Hue Value (0-180)")
-            # plt.ylabel("Frequency")
-            # plt.grid(True)
-            # plt.show()
+            
 
             # Identify significant peaks in the histogram that indicate color regions
             peak_threshold = 0.20 * max(hist)  # Define a threshold for peak detection
             peaks = np.where(hist > peak_threshold)[0]
+            # check for very close peaks and ignore them
             
             peaks = peaks[peaks > 0]
             peaks.sort()
             
-            for i in range(1, len(peaks)):
-                if abs(peaks[i] - peaks[i-1]) < 5:
-                    peaks[i] = 0
-                
-            peaks = peaks[peaks > 0]
+            combined_peaks = []
 
+            if len(peaks) > 0:
+                current_peak = peaks[0]
+                for i in range(1, len(peaks)):
+                    if abs(peaks[i] - current_peak) < 5:
+                        continue
+                    else:
+                        combined_peaks.append(current_peak)
+                        current_peak = peaks[i]
+                combined_peaks.append(current_peak)
+            peaks = np.array(combined_peaks)
+            
+        
+                
+
+            print("Detected Peaks:", peaks)
 
             # Step 1: Filter out pixels not close to any peak or that are too close to white
             filtered_segment = np.zeros_like(hsv_segment)
@@ -233,8 +229,8 @@ class CaptchaSegmenter:
             # Loop over the detected hue peaks
             for peak in peaks:
                 # Define a range around each peak (±20 degrees)
-                lower_bound = np.array([max(peak - 5, 0)], dtype=np.uint8)
-                upper_bound = np.array([min(peak + 5, 179)], dtype=np.uint8)
+                lower_bound = np.array([max(peak - 8, 0)], dtype=np.uint8)
+                upper_bound = np.array([min(peak + 8, 179)], dtype=np.uint8)
                 
                 # Create masks for hues within the peak range and remove near-white pixels
                 peak_mask = cv2.inRange(hue_channel, lower_bound, upper_bound)
@@ -259,35 +255,34 @@ class CaptchaSegmenter:
                 x_min, x_max = min(all_x), max(all_x)
                 y_min, y_max = min(all_y), max(all_y)
 
-                box = (x+x_min, y+y_min, x_max - x_min, y_max - y_min)
+                if x_min < 0 or x_max < 0 or y_min < 0 or y_max < 0:
+                    continue
+
+                box = (x + x_min, y + y_min, x_max - x_min, y_max - y_min)
                 final.append(box)
 
-                # plt.imshow(af[:, x_min: x_max], cmap="gray")
-                # plt.title(f"filter peak {peak}")
-                # # plt.axis('off')
-                # plt.show()
+                img = af[:, x_min: x_max]
+               
+                # Plot the colored image after using the filter peak
+                if x_min == x_max:
+                    continue
+                colored_img = kk[:, x_min: x_max]
                 
-        ll = sorted(final, key=lambda x: x[0])
-    
-        self.detected_letters = ll
-        print(ll)
-        # Draw vertical lines between each grouped bounding box
-        for i in range(1, len(ll)):
-            # Calculate x-position between grouped bounding boxes
-            prev_x = ll[i - 1][0] + ll[i - 1][2]
-            curr_x = ll[i][0]
-            line_x = (prev_x + curr_x) // 2
 
-            # Draw the vertical line at this position
-            cv2.line(segmented_image, (line_x, 0), (line_x, captcha_area.shape[0]), (0, 0, 255), 1)
-            self.line_coordinates.append(line_x)
-        
-        # store the segmented image in the output folder
-        output_dir = os.path.join("segmented_images")
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        cv2.imwrite(os.path.join(output_dir, f"{self.captcha_text}.png"), segmented_image)
-        
+                # Plot the grayscale image after using the filter peak
+                gray_img = cv2.cvtColor(colored_img, cv2.COLOR_BGR2GRAY)
+                
+                # Convert the grayscale image to binary by thresholding
+                _, bw_img = cv2.threshold(gray_img, 1, 255, cv2.THRESH_BINARY)
+
+                # Ensure the image is binary (0 or 255)
+                bw_img[bw_img > 0] = 255
+
+    
+                letters.append((bw_img, (x + x_min, y + y_min, w, h)))
+        letters = sorted(letters, key=lambda x: x[1][0])
+        self.detected_letters = [letter[0] for letter in letters]
+            
     def image_resize(self, image, width, height, inter = cv2.INTER_AREA):
         # initialize the dimensions of the image to be resized and
         # grab the image size
@@ -337,13 +332,9 @@ class CaptchaSegmenter:
         #     cv2.imwrite(os.path.join(output_dir, f"{image_number}.png"), letter_image)
         #     char_index += 1
         
-        self.line_coordinates = sorted(self.line_coordinates)
-        for i in range(len(self.line_coordinates)):
-            if i == 0 :
-                letter_image = self.cropped_image[:, 0:self.line_coordinates[i]]
-            else:
-                letter_image = self.cropped_image[:, self.line_coordinates[i-1]:self.line_coordinates[i]]
-            letter_image = self.image_resize(letter_image, 40, 40)
+
+        for i in range(len(self.detected_letters)):
+            letter_image = self.image_resize(self.detected_letters[i], 40, 40)
             output_dir = os.path.join(self.output_folder, self.captcha_text[char_index])
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
