@@ -17,32 +17,35 @@ MODEL_LABELS_FILENAME = "model_labels.dat"
 data = []
 labels = []
 
-def resize_to_fit(letter_image, target_size=40):
-        """
-        Resize the letter image to fit within a target size (40x40) while maintaining aspect ratio.
-        Adds padding to fill empty space and make the image square.
-        """
-        h = letter_image.shape[0]
-        w = letter_image.shape[1]
+# def resize_to_fit(letter_image, target_size=40):
+#         """
+#         Resize the letter image to fit within a target size (40x40) while maintaining aspect ratio.
+#         Adds padding to fill empty space and make the image square.
+#         """
+#         h = letter_image.shape[0]
+#         w = letter_image.shape[1]
         
-        # Calculate the scaling factor to fit the image within the target size
-        scale = target_size / max(h, w)
-        new_w, new_h = int(w * scale), int(h * scale)
+#         # Calculate the scaling factor to fit the image within the target size
+#         scale = target_size / max(h, w)
+#         new_w, new_h = int(w * scale), int(h * scale)
         
-        # Resize the image while maintaining aspect ratio
-        resized_image = cv2.resize(letter_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+#         # Resize the image while maintaining aspect ratio
+#         if new_w > 0 and new_h > 0:
+#             resized_image = cv2.resize(letter_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+#         else:
+#             resized_image = letter_image
         
-        # Create a 40x40 blank canvas with white padding (255 for white)
-        padded_image = np.ones((target_size, target_size), dtype=np.uint8) * 0
+#         # Create a 40x40 blank canvas with white padding (255 for white)
+#         padded_image = np.ones((target_size, target_size), dtype=np.uint8) * 0
         
-        # Calculate padding to center the resized image on the canvas
-        x_offset = (target_size - new_w) // 2
-        y_offset = (target_size - new_h) // 2
+#         # Calculate padding to center the resized image on the canvas
+#         x_offset = (target_size - new_w) // 2
+#         y_offset = (target_size - new_h) // 2
         
-        # Place the resized image onto the canvas
-        padded_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized_image
+#         # Place the resized image onto the canvas
+#         padded_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized_image
         
-        return padded_image
+#         return padded_image
 
 # Loop over the input images
 for label in os.listdir(LETTER_IMAGES_FOLDER):
@@ -58,7 +61,7 @@ for label in os.listdir(LETTER_IMAGES_FOLDER):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             # Resize the letter so it fits in a 20x20 pixel box
-            image = resize_to_fit(image)
+            image = cv2.resize(image, (40, 40), interpolation=cv2.INTER_AREA)
 
             # Add a third channel dimension to the image to make Keras happy
             image = np.expand_dims(image, axis=2)
