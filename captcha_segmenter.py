@@ -181,7 +181,7 @@ class CaptchaSegmenter:
         if len(self.detected_letters) != len(self.captcha_text):
             print("Detected letters do not match the CAPTCHA text.")
             CaptchaSegmenter.skipped += 1
-            mismatch_dir = os.path.join(self.output_folder, "mismatched")
+            mismatch_dir = "mismatched_images"
             if not os.path.exists(mismatch_dir):
                 os.makedirs(mismatch_dir)
             image_name = os.path.basename(self.image_path)
