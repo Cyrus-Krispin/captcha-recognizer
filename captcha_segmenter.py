@@ -45,7 +45,7 @@ class CaptchaSegmenter:
         all_points = np.vstack(opened_img_contours).squeeze()
         all_x, all_y = all_points[:, 0], all_points[:, 1]
 
-        pad = 10
+        pad = 0
         height, width = opened_img.shape
         x_min, x_max = max(0, min(all_x) - pad), min(width, max(all_x) + pad)
         y_min, y_max = max(0, min(all_y) - pad), min(height, max(all_y) + pad)
@@ -66,7 +66,7 @@ class CaptchaSegmenter:
             prev_x, prev_y, prev_w, prev_h = current_group
             overlap_width = min(prev_x + prev_w, x + w) - max(prev_x, x)
 
-            if overlap_width > 0 and (overlap_width >= 0.6 * w or overlap_width >= 0.6 * prev_w):
+            if overlap_width > 0 and (overlap_width >= 0.1 * w or overlap_width >= 0.1 * prev_w):
                 current_group = (
                     min(prev_x, x),
                     min(prev_y, y),
@@ -104,7 +104,7 @@ class CaptchaSegmenter:
             combined_peaks = [peaks[0]] if len(peaks) > 0 else []
 
             for peak in peaks[1:]:
-                if abs(peak - combined_peaks[-1]) >= 5:
+                if abs(peak - combined_peaks[-1]) >= 2:
                     combined_peaks.append(peak)
 
             peaks = np.array(combined_peaks)
@@ -136,8 +136,19 @@ class CaptchaSegmenter:
 
                 if x_min < 0 or x_max < 0 or y_min < 0 or y_max < 0:
                     continue
+                
+                padding = 2
+                padded_bin = cv2.copyMakeBorder(
+                    bin[:, x_min:x_max],  # The sliced binary image
+                    padding,              # Padding for the top
+                    padding,              # Padding for the bottom
+                    padding,              # Padding for the left
+                    padding,              # Padding for the right
+                    cv2.BORDER_CONSTANT,  # Border type
+                    value=0               # Padding value
+                )
         
-                letters.append((bin, (x_box + x_min, y_box + y_min, w_box, h_box)))
+                letters.append((padded_bin, (x_box + x_min, y_box + y_min, w_box, h_box)))
 
 
         letters.sort(key=lambda letter: letter[1][0])

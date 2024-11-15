@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
-image_path = "main/1fuhmmn-0.png" #"train/zn927m-0.png"#"train/2jefvnxe-0.png" #"train/zn927m-0.png"
+image_path = "main/0vug13-0.png" #"train/zn927m-0.png"#"train/2jefvnxe-0.png" #"train/zn927m-0.png"
 image = cv2.imread(image_path)
 
 plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
@@ -119,8 +119,12 @@ for i in range(len(grouped_boxes)):
 
         if x_min < 0 or x_max < 0 or y_min < 0 or y_max < 0:
             continue
+
+        bin = bin[:, x_min: x_max]
+        padding = 2
+        padded_bin = cv2.copyMakeBorder(bin[:, x_min: x_max], padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=0)
  
-        detected_letters.append((bin, (x_box + x_min, y_box + y_min, w_box, h_box)))
+        detected_letters.append((padded_bin, (x_box + x_min, y_box + y_min, w_box, h_box)))
 
 
 detected_letters.sort(key=lambda letter: letter[1][0])
