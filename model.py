@@ -17,33 +17,34 @@ MODEL_LABELS_FILENAME = "model_labels.dat"
 data = []
 labels = []
 
-def resize_to_fit(image, width, height):
-    """
-    A helper function to resize an image to fit within a given size without using imutils.
-    :param image: image to resize
-    :param width: desired width in pixels
-    :param height: desired height in pixels
-    :return: the resized image
-    """
-    (h, w) = image.shape[:2]
-
-    # Calculate the aspect ratio and resize accordingly
-    if w > h:
-        new_w = width
-        new_h = int((height / float(w)) * h)
-        image = cv2.resize(image, (new_w, new_h))
-    else:
-        new_h = height
-        new_w = int((width / float(h)) * w)
-        image = cv2.resize(image, (new_w, new_h))
-
-    padW = (width - image.shape[1]) // 2
-    padH = (height - image.shape[0]) // 2
-
-    image = cv2.copyMakeBorder(image, padH, padH, padW, padW, cv2.BORDER_REPLICATE)
-    image = cv2.resize(image, (width, height))
-
-    return image
+def resize_to_fit(self, letter_image, target_size=40):
+        """
+        Resize the letter image to fit within a target size (40x40) while maintaining aspect ratio.
+        Adds padding to fill empty space and make the image square.
+        """
+        # Get current dimensions of the letter image
+        print(letter_image)
+        h = letter_image.shape[0]
+        w = letter_image.shape[1]
+        
+        # Calculate the scaling factor to fit the image within the target size
+        scale = target_size / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+        
+        # Resize the image while maintaining aspect ratio
+        resized_image = cv2.resize(letter_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        
+        # Create a 40x40 blank canvas with white padding (255 for white)
+        padded_image = np.ones((target_size, target_size), dtype=np.uint8) * 0
+        
+        # Calculate padding to center the resized image on the canvas
+        x_offset = (target_size - new_w) // 2
+        y_offset = (target_size - new_h) // 2
+        
+        # Place the resized image onto the canvas
+        padded_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized_image
+        
+        return padded_image
 
 # Loop over the input images
 for label in os.listdir(LETTER_IMAGES_FOLDER):
@@ -59,7 +60,7 @@ for label in os.listdir(LETTER_IMAGES_FOLDER):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             # Resize the letter so it fits in a 20x20 pixel box
-            image = resize_to_fit(image, 20, 20)
+            image = resize_to_fit(image)
 
             # Add a third channel dimension to the image to make Keras happy
             image = np.expand_dims(image, axis=2)
@@ -102,7 +103,7 @@ datagen.fit(X_train)
 model = Sequential()
 
 # First convolutional layer with batch normalization, dropout, and max pooling
-model.add(Conv2D(32, (5, 5), padding="same", input_shape=(20, 20, 1), activation="relu"))
+model.add(Conv2D(32, (5, 5), padding="same", input_shape=(40, 40, 1), activation="relu"))
 model.add(BatchNormalization())
 model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 model.add(Dropout(0.25))  # Dropout layer
