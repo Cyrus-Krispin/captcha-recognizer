@@ -3,3 +3,5 @@ test/
 train/
 extracted_letter_images/
 main/
+error_images/
+cleaned_images
